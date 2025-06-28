@@ -1,0 +1,111 @@
+﻿CREATE TABLE Item (
+    Id INT PRIMARY KEY IDENTITY,
+    Name NVARCHAR(100),
+    Description NVARCHAR(255),
+    UnitPrice DECIMAL(10, 2),
+    QuantityAvailable INT
+);
+
+CREATE TABLE Invoice (
+    Id INT PRIMARY KEY IDENTITY,
+    InvoiceNumber NVARCHAR(10),
+    InvoiceDate DATE,
+    DueDate DATE,
+    CustomerName NVARCHAR(100),
+    VendorName NVARCHAR(100),
+    AmountPaid DECIMAL(10, 2)
+);
+
+
+CREATE TABLE InvoiceItem (
+    Id INT PRIMARY KEY IDENTITY,
+    InvoiceId INT FOREIGN KEY REFERENCES Invoice(Id),
+    ItemId INT FOREIGN KEY REFERENCES Item(Id),
+    Description NVARCHAR(255),
+    UnitPrice DECIMAL(10, 2),
+    Quantity INT
+);
+
+INSERT INTO Item (Name, Description, UnitPrice, QuantityAvailable)
+VALUES 
+('Mouse', 'Wireless Mouse', 500.00, 50),
+('Keyboard', 'Mechanical Keyboard', 1500.00, 30),
+('Monitor', '24 inch LED Monitor', 7000.00, 20);
+
+
+CREATE OR ALTER PROCEDURE GetAllInvoices
+AS
+BEGIN
+    SELECT 
+        i.Id,
+        i.InvoiceNumber,
+        i.InvoiceDate,
+        i.DueDate,
+        i.CustomerName,
+        i.VendorName,
+        i.AmountPaid,
+        STRING_AGG(ii.Description, ', ') AS Description
+    FROM Invoice i
+    INNER JOIN InvoiceItem ii ON ii.InvoiceId = i.Id
+    GROUP BY 
+        i.Id, i.InvoiceNumber, i.InvoiceDate, i.DueDate,
+        i.CustomerName, i.VendorName, i.AmountPaid;
+END
+
+CREATE PROCEDURE GetAllItems
+AS
+BEGIN
+    SELECT Id, Name, Description, UnitPrice, QuantityAvailable
+    FROM Item
+END
+
+
+CREATE PROCEDURE InsertInvoice
+    @InvoiceNumber NVARCHAR(50),
+    @InvoiceDate DATE,
+    @DueDate DATE,
+    @CustomerName NVARCHAR(100),
+    @VendorName NVARCHAR(100),
+    @AmountPaid DECIMAL(18, 2),
+    @NewInvoiceId INT OUTPUT
+AS
+BEGIN
+    INSERT INTO Invoice (InvoiceNumber, InvoiceDate, DueDate, CustomerName, VendorName, AmountPaid)
+    VALUES (@InvoiceNumber, @InvoiceDate, @DueDate, @CustomerName, @VendorName, @AmountPaid)
+
+    SET @NewInvoiceId = SCOPE_IDENTITY()
+END
+
+CREATE PROCEDURE InsertInvoiceItem
+    @InvoiceId INT,
+    @ItemId INT,
+    @Description NVARCHAR(MAX),
+    @UnitPrice DECIMAL(18, 2),
+    @Quantity INT
+AS
+BEGIN
+    INSERT INTO InvoiceItem (InvoiceId, ItemId, Description, UnitPrice, Quantity)
+    VALUES (@InvoiceId, @ItemId, @Description, @UnitPrice, @Quantity)
+END
+
+CREATE PROCEDURE GetInvoiceById
+    @Id INT
+AS
+BEGIN
+    SELECT * FROM Invoice WHERE Id = @Id
+END
+
+CREATE PROCEDURE GetInvoiceItemsByInvoiceId
+    @InvoiceId INT
+AS
+BEGIN
+    SELECT ItemId, Description, UnitPrice, Quantity
+    FROM InvoiceItem
+    WHERE InvoiceId = @InvoiceId
+END
+
+CREATE PROCEDURE GetAllItem
+AS
+BEGIN
+    SELECT * FROM Item
+END

@@ -62,3 +62,12 @@ Includes 3 core tables:
 
 > All data interactions use **parameterized stored procedures** to prevent SQL injection and improve performance.
 
+## 📚 Additional Notes
+
+- 📝 **Database queries and architecture-related questions** are documented in:
+
+  - **`Queries.txt`**
+  - **`databaseArchitectureAndQueries.txt`**
+
+> 📂 **These files are located in the `/wwwroot/SQL Queries/` folder.**
+

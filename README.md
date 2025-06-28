@@ -64,7 +64,7 @@ Includes 3 core tables:
 
 ## 📚 Additional Notes
 
-- 📝 **Database queries and architecture-related questions** are documented in:
+- 📝 **Database queries(Task) and Architecture and Store Procedures** are documented in:
 
   - **`Queries.txt`**
   - **`databaseArchitectureAndQueries.txt`**

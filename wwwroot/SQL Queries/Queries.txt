@@ -1,0 +1,50 @@
+﻿1.	Write a query for “Items which are most number of times available in all invoice.
+
+SELECT TOP 1 WITH TIES 
+    i.Id,
+    i.Name,
+    COUNT(ii.Id) AS TimesIncluded
+FROM InvoiceItem ii
+INNER JOIN Item i ON i.Id = ii.ItemId
+GROUP BY i.Id, i.Name
+ORDER BY COUNT(ii.Id) DESC;
+
+
+
+
+2.	Find Invoices which are from august month and amount must be greater than 1000.
+
+SELECT 
+    Id,
+    InvoiceNumber,
+    InvoiceDate,
+    DueDate,
+    CustomerName,
+    VendorName,
+    AmountPaid
+FROM Invoice
+WHERE 
+    MONTH(InvoiceDate) = 8
+    AND AmountPaid > 1000;
+
+
+
+3.	Find all Invoices which are more than 70% partially paid by the customer.
+
+SELECT 
+    i.Id,
+    i.InvoiceNumber,
+    i.AmountPaid,
+    TotalAmount,
+    CAST(i.AmountPaid * 100.0 / TotalAmount AS DECIMAL(5,2)) AS PaymentPercentage
+FROM Invoice i
+JOIN (
+    SELECT 
+        InvoiceId,
+        SUM(UnitPrice * Quantity) AS TotalAmount
+    FROM InvoiceItem
+    GROUP BY InvoiceId
+) AS totals ON i.Id = totals.InvoiceId
+WHERE 
+    i.AmountPaid < totals.TotalAmount
+    AND i.AmountPaid * 100.0 / totals.TotalAmount > 70;

@@ -1,0 +1,224 @@
+﻿@model Invoice
+@{
+    // Get the list of available items from ViewBag
+    var items = (List<Item>)ViewBag.Items ?? new List<Item>();
+    var isEdit = Model?.Id > 0;
+}
+
+<!-- Invoice Form Container -->
+<div class="container mt-5 p-4 bg-white shadow rounded-3">
+    <div class="mb-4">
+        <!-- Dynamic heading for Create/Edit -->
+        <h3 class="fw-bold text-primary">@((isEdit ? "Edit" : "Create") + " Invoice")</h3>
+    </div>
+
+    <!-- Form bound to Invoice model -->
+    <form asp-action="Create" asp-controller="Invoice" method="post">
+        <!-- Hidden field for invoice ID -->
+        <input asp-for="Id" type="hidden" />
+
+        <!-- Invoice Metadata Fields -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Invoice #</label>
+                <input asp-for="InvoiceNumber" id="InvoiceNumber" class="form-control" readonly />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Invoice Date</label>
+                <input asp-for="InvoiceDate" type="date" class="form-control" required />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-semibold">Due Date</label>
+                <input asp-for="DueDate" type="date" class="form-control" required min="@DateTime.Now.ToString("yyyy-MM-dd")" />
+            </div>
+        </div>
+
+        <!-- Line Items Table -->
+        <div class="table-responsive mb-3">
+            <table class="table table-bordered align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Item</th>
+                        <th>Description</th>
+                        <th>Unit Price</th>
+                        <th>Quantity</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody id="itemTableBody">
+                    <!-- Render existing invoice items if present -->
+                    @if (Model?.Items != null && Model.Items.Count > 0)
+                    {
+                        for (int i = 0; i < Model.Items.Count; i++)
+                        {
+                            <tr class="item-row">
+                                <td>
+                                    <!-- Item dropdown with metadata for JS -->
+                                    <select name="Items[@i].ItemId" class="form-select" onchange="fillItem(this, @i)">
+                                        @foreach (var item in items)
+                                        {
+                                            var selected = item.Id == Model.Items[i].ItemId ? "selected" : "";
+                                            <option value="@item.Id"
+                                                    data-description="@item.Description"
+                                                    data-price="@item.UnitPrice"
+                                                    data-available="@item.QuantityAvailable">
+                                                @item.Name
+                                            </option>
+                                        }
+                                    </select>
+                                </td>
+                                <!-- Auto-filled and calculated fields -->
+                                <td><input name="Items[@i].Description" class="form-control" value="@Model.Items[i].Description" readonly /></td>
+                                <td><input name="Items[@i].UnitPrice" class="form-control" type="number" value="@Model.Items[i].UnitPrice" readonly /></td>
+                                <td><input name="Items[@i].Quantity" class="form-control" type="number" value="@Model.Items[i].Quantity" min="1" onchange="recalculateTotal()" /></td>
+                                <td><input name="Items[@i].Amount" class="form-control" readonly value="@(Model.Items[i].Quantity * Model.Items[i].UnitPrice).ToString(" F2")" /></td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add new line item dynamically -->
+        <div class="mb-4">
+            <button type="button" onclick="addItem()" class="btn btn-outline-primary w-auto">
+                <i class="bi bi-plus-circle me-1"></i> Add Line
+            </button>
+        </div>
+
+        <!-- Invoice Summary and Payment Info -->
+        <div class="row justify-content-end mb-4">
+            <div class="col-md-4 bg-light p-3 rounded shadow-sm">
+                <div class="mb-3 d-flex justify-content-between">
+                    <label class="fw-semibold">Total</label>
+                    <input id="totalAmount" class="form-control text-end w-50" readonly />
+                </div>
+                <div class="mb-3 d-flex justify-content-between">
+                    <label class="fw-semibold">Amount Paid</label>
+                    <input asp-for="AmountPaid" type="number" class="form-control text-end w-50" />
+                </div>
+                <div class="d-flex justify-content-between bg-warning-subtle p-2 rounded">
+                    <label class="fw-semibold">Balance Due</label>
+                    <input id="dueAmount" class="form-control text-end w-50 bg-white" readonly />
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit button -->
+        <div class="text-center">
+            <button type="submit" class="btn btn-success px-5 py-2 shadow">
+                <i class="bi bi-save me-1"></i> @((isEdit ? "Update" : "Submit"))
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- JavaScript Section -->
+@section Scripts {
+    <script>
+
+        // Serialize items from server to JS for dynamic use
+        const items = @Html.Raw(Json.Serialize(items));
+
+        /**
+         * Auto-generate invoice number on form load (random 6-character alphanumeric)
+         */
+        function generateInvoiceNumber() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < 6; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            document.getElementById("InvoiceNumber").value = result;
+        }
+
+        /**
+         * On initial page load: generate invoice number and calculate totals
+         */
+        window.addEventListener("DOMContentLoaded", function () {
+            const invoiceField = document.getElementById("InvoiceNumber");
+            if (!invoiceField.value) {
+                generateInvoiceNumber();
+            }
+            recalculateTotal();
+        });
+
+        /**
+         * Dynamically add a new row to the item table with prefilled item data
+         */
+        function addItem() {
+            const container = document.getElementById("itemTableBody");
+            const index = container.children.length;
+
+            const row = document.createElement("tr");
+            row.classList.add("item-row");
+
+            row.innerHTML = `
+                <td>
+                    <select name="Items[${index}].ItemId" class="form-select" onchange="fillItem(this, ${index})">
+                        ${items.map(i => `<option value='${i.id}' data-description='${i.description}' data-price='${i.unitPrice}' data-available='${i.quantityAvailable}'>${i.name}</option>`).join('')}
+                    </select>
+                </td>
+                <td><input name="Items[${index}].Description" class="form-control" readonly /></td>
+                <td><input name="Items[${index}].UnitPrice" class="form-control" type="number" readonly /></td>
+                <td><input name="Items[${index}].Quantity" class="form-control" type="number" value="1" min="1" onchange="recalculateTotal()" /></td>
+                <td><input name="Items[${index}].Amount" class="form-control" readonly /></td>
+            `;
+
+            container.appendChild(row);
+            fillItem(row.querySelector("select"), index); // Auto-fill initial values
+        }
+
+        /**
+         * Auto-fill fields based on selected item from dropdown
+         */
+        function fillItem(select, index) {
+            const option = select.options[select.selectedIndex];
+            const price = parseFloat(option.dataset.price);
+            const desc = option.dataset.description;
+
+            document.getElementsByName(`Items[${index}].Description`)[0].value = desc;
+            document.getElementsByName(`Items[${index}].UnitPrice`)[0].value = price;
+            document.getElementsByName(`Items[${index}].Amount`)[0].value = price.toFixed(2);
+
+            recalculateTotal();
+        }
+
+        /**
+         * Recalculate total amount, validate stock, and update balance due
+         */
+        function recalculateTotal() {
+            const rows = document.querySelectorAll(".item-row");
+            let total = 0;
+
+            rows.forEach((row, index) => {
+                const qtyInput = row.querySelector(`[name='Items[${index}].Quantity']`);
+                const priceInput = row.querySelector(`[name='Items[${index}].UnitPrice']`);
+                const amountInput = row.querySelector(`[name='Items[${index}].Amount']`);
+
+                const qty = parseInt(qtyInput.value || 0);
+                const price = parseFloat(priceInput.value || 0);
+                const available = parseInt(row.querySelector("select option:checked").dataset.available || 0);
+
+                // Validate against available stock
+                if (qty > available) {
+                    alert(`Only ${available} items available.`);
+                    qtyInput.value = available;
+                }
+
+                const amount = price * qty;
+                amountInput.value = amount.toFixed(2);
+                total += amount;
+            });
+
+            document.getElementById("totalAmount").value = total.toFixed(2);
+
+            const paid = parseFloat(document.querySelector("[name='AmountPaid']").value || 0);
+            document.getElementById("dueAmount").value = (total - paid).toFixed(2);
+        }
+
+        // Attach listener to recalculate balance when amount paid changes
+        document.querySelector("[name='AmountPaid']").addEventListener("input", recalculateTotal);
+
+    </script>
+}
